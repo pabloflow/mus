@@ -41,3 +41,23 @@ class RulePlayer(Player):
         idx_sorted = sorted(range(4), key=lambda i: values[i])
         discards = [i for i in idx_sorted if values[i] <= 5]
         return discards[:3]
+    
+class AutoPlayer(Player):
+    """Jugador automático (decisiones aleatorias)."""
+    def decide_raise(self):
+        return random.choice([2,3,5])
+    
+    def decide_ordago(self):
+        return random.choice(['s', 'n'])
+
+    def decide_action(self, ronda, apuesta_actual):
+        
+
+        if apuesta_actual == 0:
+            posibles = ["p", "e", "o"]
+        else:
+            posibles = ["q", "n", "r", "o"]
+
+        accion = random.choice(posibles)
+        print(f"{self.name} elige: {accion.upper()}")
+        return accion

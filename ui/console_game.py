@@ -1,5 +1,5 @@
 from game.cards import Card
-from game.players import RandomPlayer, RulePlayer
+from game.players import RandomPlayer, RulePlayer, AutoPlayer
 from game.engine import Game
 
 def play_console():
@@ -7,7 +7,7 @@ def play_console():
     # mano_adri = [Card(12,'oros'), Card(12,'copas'), Card(6,'bastos'), Card(5,'espadas')]
     # mano_pablo = [Card(3,'oros'), Card(3,'copas'), Card(6,'bastos'), Card(5,'espadas')]
 
-    p1 = RulePlayer('Adri')
+    p1 = AutoPlayer('Adri')
     p2 = RandomPlayer('Pablo')
 
     g = Game(p1, p2, mano=p2)

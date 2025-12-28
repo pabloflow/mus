@@ -1,6 +1,6 @@
 from .cards import Deck
 from .evaluator import HandEvaluator
-from .players import Player
+from .players import Player, AutoPlayer
 import random
 
 
@@ -78,10 +78,13 @@ class Game:
           print(f"\nTurno de {turno.name}:")
           print(f"➡ Apuesta actual: {apuesta_actual if apuesta_actual > 0 else 'ninguna'}")
 
-          # --- Opciones según el contexto ---
-          if apuesta_actual == 0:
+        
+          if hasattr(turno, "decide_action"):
+                accion = turno.decide_action(key, apuesta_actual)
+          else: 
+            if apuesta_actual == 0:
               accion = input(f"{turno.name}, ¿qué haces? (paso / envido / ordago): ").strip().lower()
-          else:
+            else:
               accion = input(f"{turno.name}, ¿qué haces? (quiero / no quiero / reenvido / ordago): ").strip().lower()
 
           # --- Procesar acción ---
@@ -102,7 +105,10 @@ class Game:
               continue
 
           elif accion == "r":
-              subida = int(input(f"{turno.name}, ¿cuántas piedras subes? (+2 mínimo): ").strip() or "2")
+              if hasattr(turno, "decide_raise"):
+                  subida = turno.decide_raise(apuesta_actual)
+              else:
+                subida = int(input(f"{turno.name}, ¿cuántas piedras subes? (+2 mínimo): ").strip() or "2")
               apuesta_anterior = apuesta_actual
               apuesta_actual += subida
               ultimo_apostador = turno
@@ -127,7 +133,10 @@ class Game:
           elif accion == "o":
               apuesta_anterior = apuesta_actual
               print(f"🔥 ¡ÓRDAGO! {turno.name} apuesta TODO el juego (40 piedras).")
-              respuesta = input(f"{otro.name}, ¿quieres el órdago? (s/n): ").strip().lower()
+              if hasattr(otro, "decide_ordago"):
+                respuesta = otro.decide_ordago()  
+              else:
+                respuesta = input(f"{otro.name}, ¿quieres el órdago? (s/n): ").strip().lower()
               
               if respuesta == "s":
                   print("🃏 Se acepta el órdago. ¡Se decide el juego completo ahora!")
@@ -143,6 +152,7 @@ class Game:
           else:
               print("⚠️ Opción no válida. Intenta de nuevo.")
               continue
+    
 
 
     def play(self, piedras):
@@ -154,50 +164,74 @@ class Game:
         e2 = HandEvaluator.evaluate_all(self.p2.hand)
        
         results = {}
+        rondas_resultado = {}
+        
 
         for key in ['grande', 'chica', 'pares', 'juego']:
+            extra = 0
         # --- Condiciones especiales ---
-          if key == 'pares':
-            if e1['pares'][0] == 1 and e2['pares'][0] == 1:
-                print("\nNingún jugador tiene pares. No se juega esta ronda.")
-                continue
-            elif e1['pares'][0] == 1 or e2['pares'][0] == 1:
-                ganador = self.p1 if e1['pares'][0] > e2['pares'][0] else self.p2
-                
-                results['pares'] = f"{ganador.name} (pares automáticos)"
-                print(f"\nSolo {ganador.name} tiene pares.")
-                continue
+            if key == 'pares':
+                if e1['pares'][0] == 1 and e2['pares'][0] == 1:
+                    print("\nNingún jugador tiene pares. No se juega esta ronda.")
+                    continue
+                elif e1['pares'][0] == 1 or e2['pares'][0] == 1:
+                    ganador = self.p1 if e1['pares'][0] > e2['pares'][0] else self.p2
+                    results['pares'] = f"{ganador.name} (pares automáticos)"
+                    print(f"\nSolo {ganador.name} tiene pares.")
+                    continue
 
-          if key == 'juego':
-            if e1['juego'][0] == 1 and e2['juego'][0] == 1:
-                print("\nNingún jugador tiene juego. Se jugará al PUNTO.")
-                key = 'punto'
-            elif e1['juego'][0] == 1 or e2['juego'][0] == 1:
-                ganador = self.p1 if e1['juego'][0] > e2['juego'][0] else self.p2
+            if key == 'juego':
+                if e1['juego'][0] == 1 and e2['juego'][0] == 1:
+                    print("\nNingún jugador tiene juego. Se jugará al PUNTO.")
+                    key = 'punto'
+                elif e1['juego'][0] == 1 or e2['juego'][0] == 1:
+                    ganador = self.p1 if e1['juego'][0] > e2['juego'][0] else self.p2
                 
-                results['juego'] = f"{ganador.name} (juego automático)"
-                print(f"\nSolo {ganador.name} tiene juego.")
-                continue
+                    results['juego'] = f"{ganador.name} (juego automático)"
+                    print(f"\nSolo {ganador.name} tiene juego.")
+                    continue
 
         # --- Apuestas con reenvido ---
-          print(f"\nRonda de {key.upper()}")
+            print(f"\nRonda de {key.upper()}")
 
-          ganador, piedras_ganadas, ordago = self.betting_round(key, e1, e2)
+            ganador, piedras_ganadas, ordago = self.betting_round(key, e1, e2)
 
-          if ganador is None:
-              print(f"🤝 No hubo apuesta en {key}. Nadie gana piedras.")
-              continue
+            if ganador is None:
+                print(f"🤝 No hubo apuesta en {key}. ")
+                if key == 'grande' or key == 'chica':
+                    extra = 1
+                continue
 
-          if ordago:
-              print(f"🏆 ¡{ganador.name} gana la partida por ÓRDAGO!")
-              # Devolvemos inmediatamente con victoria total
-              piedras[ganador.name] = float("inf")
-              return piedras, {key: ganador.name}, (e1, e2)
-
+            if ordago:
+                print(f"🏆 ¡{ganador.name} gana la partida por ÓRDAGO!")
+                # Devolvemos inmediatamente con victoria total
+                piedras[ganador.name] = 40
+                return piedras, {key: ganador.name}, (e1, e2)
+            
+            if key == 'pares':
+                if HandEvaluator.pares_value(ganador.hand)[0] == 4:
+                    extra = 3
+                elif HandEvaluator.pares_value(ganador.hand)[0] == 3:
+                    extra = 2
+                elif HandEvaluator.pares_value(ganador.hand)[0] == 2:
+                    extra = 1
+            elif key == 'juego':
+                if HandEvaluator.juego_value(ganador.hand)[1] == 0:
+                    extra = 3
+                else: 
+                    extra = 2
+                  
+          
+            rondas_resultado[key] = {
+                "ganador": ganador.name,
+                "piedras": piedras_ganadas,
+                "extra" : extra
+              }
+            results[key] = ganador.name
           # Si fue una ronda normal:
-          piedras[ganador.name] += piedras_ganadas
-          results[key] = ganador.name
-          print(f"💎 {ganador.name} gana {piedras_ganadas} piedra(s) en {key}.")
+            piedras[ganador.name] += piedras_ganadas
+            results[key] = ganador.name
+            print(f"💎 {ganador.name} gana {piedras_ganadas} piedra(s) en {key}.")
 
         return piedras, results, (e1,e2)
         # for key in ['grande','chica','pares','juego']:
